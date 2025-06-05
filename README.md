@@ -2,6 +2,8 @@
 
 **GDLibrary** is a pure GDScript system for building reusable, distributable libraries—similar to DLLs—directly in Godot Engine. It allows you to define, export, load, and package modular `.gdl` files and convert them into binary `.gdlb` format for efficient use and distribution.
 
+**Note:** While Godot already has an existing plugin system, I created GDLibrary to build my own custom library system tailored specifically for modular GDScript code reuse and distribution.
+
 ---
 
 ## 🚀 Features
