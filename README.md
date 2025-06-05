@@ -36,7 +36,8 @@ To create a new module (library), run the following GDScript commands:
 
 ```gdscript
 GDL_Core.create_gdl_module("testModule")
-GDL_Core.export_module_source("testModule")```
+GDL_Core.export_module_source("testModule")
+```
 
 This creates a new file at res://gdl_modules/testModule.gdl with:
 
@@ -54,7 +55,8 @@ Once a `.gdlb` or `.gdlb` file is in res://gdl_modules/, you can load it:
 
 ```gdscript
 var test = GDL_Core.get_module("testModule")
-test.some_function()```
+test.some_function()
+```
 
 get_module("name") returns the loaded module (as a script instance) or loads it if not already active.
 
@@ -65,7 +67,8 @@ get_module("name") returns the loaded module (as a script instance) or loads it 
 To convert all `.gdl` source files into `.gdlb` binaries:
 
 ```gdscript
-GDL_Core.convert_all_gdl_to_binary()```
+GDL_Core.convert_all_gdl_to_binary()
+```
 
 This compresses and saves .gdlb files alongside the originals for shipping in .pck or .zip exports.
 
@@ -85,7 +88,8 @@ This compresses and saves .gdlb files alongside the originals for shipping in .p
 At runtime, you can check if those dependencies are loaded:
 
 ```gdscript
-check_dependencies()```
+check_dependencies()
+```
 
 This returns true if all required modules are loaded, otherwise logs which are missing.
 
@@ -95,7 +99,8 @@ This returns true if all required modules are loaded, otherwise logs which are m
 func _ready():
 	var utils = GDL_Core.get_module("Utils")
 	if utils and utils.check_dependencies():
-		utils.rainbow_log("Hello from GDLibrary!")```
+		utils.rainbow_log("Hello from GDLibrary!")
+```
 
 ---
 
