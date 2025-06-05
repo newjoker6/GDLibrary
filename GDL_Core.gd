@@ -13,6 +13,12 @@ var module_paths = {}
 # Creates the module path if none exists
 func _init() -> void:
 	if Engine.is_editor_hint():
+		var settings = EditorInterface.get_editor_settings()
+		var exts = settings.get_setting("docks/filesystem/textfile_extensions")
+		if (!"gdl" in exts) and (!"gdlb" in exts):
+			var newexts = "%s,gdl,gdlb" %exts
+			settings.set_setting("docks/filesystem/textfile_extensions", newexts)
+		
 		var dir = DirAccess.open("res://")
 		if dir and not dir.dir_exists("gdl_modules"):
 			var err = dir.make_dir("gdl_modules")
