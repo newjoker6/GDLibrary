@@ -2,10 +2,12 @@ extends Control
 
 
 func _ready():
+	#GDL_Core.convert_all_gdl_to_binary()
 	print(GDL_Core.get_available_modules())
 	print(GDL_Core.get_loaded_modules())
 	var utils = GDL_Core.get_module("Utils")
 	print(utils.print_function_signature("rainbowLog"))
+	#print(GDL_Core.print_module_function_signature("Utils", "rainbowLog"))
 	#for arg in utils.get_function_argument_details("rainbowLog"):
 		#print(utils.printPretty(arg))
 		

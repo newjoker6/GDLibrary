@@ -1,0 +1,388 @@
+# UtilsGDL.gd - Utils converted to GDL module
+extends GDLModule
+
+## Collection of useful functions all devs need
+##
+## The `UtilsGDL` module provides various utility functions for debugging, logging, encryption,
+## and memory management. It includes methods for displaying dynamic log messages with visual
+## effects, handling AES encryption in different modes, and monitoring memory and VRAM usage.
+
+## A static instance of the AESContext used for AES encryption and decryption operations.
+var aes = AESContext.new()
+
+## Defines different encryption modes that can be used with encryption functions:
+## - XOR: A basic XOR encryption mode.
+## - ECB: AES encryption using the ECB (Electronic Codebook) mode.
+## - CBC: AES encryption using the CBC (Cipher Block Chaining) mode.
+enum ENCRYPTIONMODE {
+	XOR,
+	ECB,
+	CBC
+}
+
+func _init():
+	module_name = "UtilsGDL"
+	module_version = "1.0.0"
+	module_author = "Glitched Code"
+	module_description = "Collection of useful utility functions for debugging, logging, encryption, and memory management"
+	dependencies = []
+
+# ============================================================================
+# LOGGING FUNCTIONS
+# ============================================================================
+
+## Logs a message with a rainbow-colored effect
+func rainbowLog(msg: String, pastel: bool = false) -> void:
+	if pastel:
+		print_rich("[rainbow]{msg}[/rainbow]".format({"msg": msg}))
+	else:
+		print_rich("[rainbow sat=0.2]{msg}[/rainbow]".format({"msg": msg}))
+
+## Logs a message with a flashing (pulsing) effect
+func flashLog(msg: String, colour: Color = Color.DARK_SLATE_BLUE, freq: float = 1.0, easeLevel: float = -2.0) -> void:
+	print_rich("[pulse freq={freq} color={col} ease={ease}]{msg}[/pulse]".format({
+		"msg": msg,
+		"col": colour.to_html(false),
+		"freq": freq,
+		"ease": easeLevel
+	}))
+
+## Logs a message with a gradient color effect
+func gradientLog(msg: String, fromColor: Color = Color.RED, toColor: Color = Color.GREEN) -> void:
+	var rich_text = ""
+	var steps = msg.length() - 1
+	
+	for i in range(msg.length()):
+		var t = 0.0 if steps == 0 else float(i) / steps
+		var current_color = fromColor.lerp(toColor, t)
+		rich_text += "[color=#{0}]{1}[/color]".format([current_color.to_html(false), msg[i]])
+	
+	print_rich(rich_text)
+
+## Logs a message with a highlighted background and customized text color
+func highlightLog(msg: String, bgColour: Color = Color.GREEN_YELLOW, textColour: Color = Color.BLACK) -> void:
+	print_rich("[bgcolor={col}][color={col2}]{msg}[/color][/bgcolor]".format({
+		"msg": msg,
+		"col": bgColour.to_html(false),
+		"col2": textColour.to_html(false),
+	}))
+
+## Delays the execution of a function by a specified amount of time
+func delayCall(target_node: Node, func_ref: Callable, time: float, args: Array = []) -> void:
+	await target_node.get_tree().create_timer(time).timeout
+	func_ref.callv(args)
+
+# ============================================================================
+# DEBUGGING & INSPECTION FUNCTIONS
+# ============================================================================
+
+## Prints a formatted dictionary with color
+func printPretty(dict: Dictionary) -> void:
+	var result = "{\n"
+	for key in dict.keys():
+		var value = dict[key]
+		var value_color = getValueColor(value)
+		result += "\t[color=powder_blue]\"{key}\"[/color]: [color={val_col}]{val}[/color],\n".format({
+			"key": key,
+			"val_col": value_color.to_html(),
+			"val": valueToString(value)
+		})
+	result += "}"
+	print_rich(result)
+
+## Returns a color corresponding to the type of the given value
+func getValueColor(value: Variant) -> Color:
+	match typeof(value):
+		TYPE_INT, TYPE_FLOAT:
+			return Color.LIME_GREEN 
+		TYPE_STRING:
+			return Color.GOLD 
+		TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY:
+			return Color.LIGHT_GOLDENROD 
+		TYPE_DICTIONARY:
+			return Color.LIGHT_GREEN 
+		TYPE_BOOL:
+			return Color.INDIAN_RED 
+		TYPE_COLOR:
+			return Color.MEDIUM_PURPLE 
+		TYPE_VECTOR2, TYPE_VECTOR3:
+			return Color.SANDY_BROWN
+		_:
+			return Color.GRAY
+
+## Converts a given value into a string representation
+func valueToString(value: Variant) -> String:
+	if typeof(value) == TYPE_STRING:
+		return '"{0}"'.format([value])
+	elif typeof(value) == TYPE_ARRAY or typeof(value) == TYPE_DICTIONARY:
+		return JSON.stringify(value, "\t")
+	else:
+		return str(value)
+
+## Prints the type of a variable along with its name
+func printType(varName: String, value: Variant) -> Variant:
+	var type_names = {
+		TYPE_NIL: "Nil", TYPE_BOOL: "Bool", TYPE_INT: "Int", TYPE_FLOAT: "Float",
+		TYPE_STRING: "String", TYPE_VECTOR2: "Vector2", TYPE_VECTOR3: "Vector3",
+		TYPE_COLOR: "Color", TYPE_ARRAY: "Array", TYPE_DICTIONARY: "Dictionary",
+		TYPE_OBJECT: "Object", TYPE_NODE_PATH: "NodePath", TYPE_TRANSFORM2D: "Transform2D",
+		TYPE_TRANSFORM3D: "Transform3D", TYPE_RID: "RID", TYPE_QUATERNION: "Quaternion",
+		TYPE_SIGNAL: "Signal", TYPE_CALLABLE: "Callable", TYPE_PACKED_BYTE_ARRAY: "PackedByteArray",
+		TYPE_PACKED_INT32_ARRAY: "PackedInt32Array", TYPE_PACKED_INT64_ARRAY: "PackedInt64Array",
+		TYPE_PACKED_FLOAT32_ARRAY: "PackedFloat32Array", TYPE_PACKED_FLOAT64_ARRAY: "PackedFloat64Array",
+		TYPE_PACKED_STRING_ARRAY: "PackedStringArray", TYPE_PACKED_VECTOR2_ARRAY: "PackedVector2Array",
+		TYPE_PACKED_VECTOR3_ARRAY: "PackedVector3Array", TYPE_PACKED_COLOR_ARRAY: "PackedColorArray",
+	}
+
+	var type_value: int = typeof(value)
+	var type_name: String = type_names.get(type_value, "Unknown")
+	print_rich("[color=cyan]{name}[/color] is of type [color=yellow]{type}[/color]".format({
+		"name": varName, "type": type_name
+	}))
+	return type_name
+
+# ============================================================================
+# PERFORMANCE MONITORING FUNCTIONS
+# ============================================================================
+
+## Logs the current memory usage of the game in megabytes
+func logMemoryUsage() -> void:
+	print_rich("[color=lightgreen]Memory Usage: {mem} MB[/color]".format({
+		"mem": "%.2f" % (OS.get_static_memory_usage() / (1024.0 * 1024.0))
+	}))
+
+## Logs the current overall VRAM (Video Memory) usage of the system
+func logVRAMUsage() -> void:
+	var VRAM = RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED) / (1024.0 * 1024.0)
+	var formatted_VRAM = "%.2f" % VRAM
+	print_rich("[color=cyan]Overall VRAM (Video Memory): {video_mem} MB[/color]".format({"video_mem": formatted_VRAM}))
+
+## Logs detailed rendering statistics
+func logRenderingStats() -> void:
+	var vidMem = "%.2f" % (RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_VIDEO_MEM_USED) / (1024.0 * 1024.0))
+	var buffMem = "%.2f" % (RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_BUFFER_MEM_USED) / (1024.0 * 1024.0))
+	var textureMem = "%.2f" % (RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED) / (1024.0 * 1024.0))
+	
+	print_rich("[color=cyan]Video Memory (Overall VRAM): {video_mem} MB[/color]".format({"video_mem": vidMem}))
+	print_rich("[color=yellow]Texture Memory: {texture_mem} MB[/color]".format({"texture_mem": textureMem}))
+	print_rich("[color=green]Buffer Memory: {buffer_mem} MB[/color]".format({"buffer_mem": buffMem}))
+
+## Logs the current frames per second (FPS) of the game
+func logFPS() -> void:
+	print_rich("[color=yellow]FPS: {fps}[/color]".format({"fps": Engine.get_frames_per_second()}))
+
+# ============================================================================
+# FILE I/O FUNCTIONS
+# ============================================================================
+
+## Writes a dictionary to a JSON file at the specified path
+func writeJsonFile(path: String, data: Dictionary) -> void:
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_string(JSON.stringify(data, "\t"))
+		file.close()
+
+## Reads a JSON file from the specified path and returns its contents as a dictionary
+func readJsonFile(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file = FileAccess.open(path, FileAccess.READ)
+	if file:
+		var content = JSON.parse_string(file.get_as_text())
+		file.close()
+		return content if content else {}
+	return {}
+
+# ============================================================================
+# ENCRYPTION FUNCTIONS
+# ============================================================================
+
+## Pads the provided data to make its length a multiple of 16 bytes (AES block size)
+func padData(data: PackedByteArray) -> PackedByteArray:
+	var padding_size = 16 - (data.size() % 16)
+	if padding_size == 16: 
+		padding_size = 0
+	var padded_data = data.duplicate()
+	for i in range(padding_size):
+		padded_data.append(0)
+	return padded_data
+
+## Removes padding from the given data
+func removePadding(data: PackedByteArray) -> PackedByteArray:
+	var padding_size = 0
+	for i in range(data.size() - 1, -1, -1):
+		if data[i] == 0:
+			padding_size += 1
+		else:
+			break
+	return data.slice(0, data.size() - padding_size)
+
+## Performs XOR encryption or decryption on the provided data using the provided key
+func xorEncryptDecrypt(data: PackedByteArray, key: int) -> PackedByteArray:
+	var result: PackedByteArray = PackedByteArray()
+	for i in range(data.size()):
+		result.append(data[i] ^ key)
+	return result
+
+## Encrypts the provided data using AES in CBC mode
+func encryptCbc(data: PackedByteArray, key: String, iv: String) -> PackedByteArray:
+	var padded_data = padData(data)
+	aes.start(AESContext.MODE_CBC_ENCRYPT, key.to_utf8_buffer(), iv.to_utf8_buffer())
+	var encrypted_data = aes.update(padded_data)
+	aes.finish()
+	return encrypted_data
+
+## Decrypts the provided data using AES in CBC mode
+func decryptCbc(data: PackedByteArray, key: String, iv: String) -> PackedByteArray:
+	aes.start(AESContext.MODE_CBC_DECRYPT, key.to_utf8_buffer(), iv.to_utf8_buffer())
+	var decrypted_data = aes.update(data)
+	aes.finish()
+	return removePadding(decrypted_data)
+
+## Encrypts the provided data using AES in ECB mode
+func encryptEcb(data: PackedByteArray, key: String) -> PackedByteArray:
+	var padded_data = padData(data)
+	aes.start(AESContext.MODE_ECB_ENCRYPT, key.to_utf8_buffer())
+	var encrypted_data = aes.update(padded_data)
+	aes.finish()
+	return encrypted_data
+
+## Decrypts the provided data using AES in ECB mode
+func decryptEcb(data: PackedByteArray, key: String) -> PackedByteArray:
+	aes.start(AESContext.MODE_ECB_DECRYPT, key.to_utf8_buffer())
+	var decrypted_data = aes.update(data)
+	aes.finish()
+	return removePadding(decrypted_data)
+
+# ============================================================================
+# DATA CONVERSION FUNCTIONS
+# ============================================================================
+
+## Converts a dictionary to a PackedByteArray
+func varToBytes(data: Dictionary) -> PackedByteArray:
+	var buffer = PackedByteArray()
+	var json_string = JSON.stringify(data)
+	buffer.append_array(json_string.to_utf8_buffer())
+	return buffer
+
+## Converts a PackedByteArray back to a dictionary
+func bytesToVar(bytes: PackedByteArray) -> Dictionary:
+	var json_string = bytes.get_string_from_utf8()
+	var result = JSON.parse_string(json_string)
+	return result if result else {}
+
+# ============================================================================
+# SAVE/LOAD FUNCTIONS
+# ============================================================================
+
+## Saves the game data to a file in a specified save slot
+func saveGame(data: Dictionary, slot: int = 1, encryptionMode: ENCRYPTIONMODE = ENCRYPTIONMODE.ECB, savePath: String = "user://") -> void:
+	var path = savePath + "save_slot" + str(slot) + ".sav"
+	var bytes = varToBytes(data)
+
+	match encryptionMode:
+		ENCRYPTIONMODE.XOR:
+			bytes = xorEncryptDecrypt(bytes, 12345)
+		ENCRYPTIONMODE.ECB:
+			bytes = encryptEcb(bytes, "My secret key!!!")
+		ENCRYPTIONMODE.CBC:
+			bytes = encryptCbc(bytes, "My secret key!!!", "My secret iv!!!!")
+
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file:
+		file.store_buffer(bytes)
+		file.close()
+		print("Game saved to: " + path)
+
+## Loads game data from a specified save slot
+func loadGame(slot: int = 1, encryptionMode: ENCRYPTIONMODE = ENCRYPTIONMODE.ECB, savePath: String = "user://") -> Dictionary:
+	var path = savePath + "save_slot" + str(slot) + ".sav"
+	if not FileAccess.file_exists(path):
+		print("Save file not found: " + path)
+		return {}
+	
+	var file = FileAccess.open(path, FileAccess.READ)
+	if not file:
+		print("Failed to open save file: " + path)
+		return {}
+	
+	var bytes = file.get_buffer(file.get_length())
+	file.close()
+	
+	match encryptionMode:
+		ENCRYPTIONMODE.XOR:
+			bytes = xorEncryptDecrypt(bytes, 12345)
+		ENCRYPTIONMODE.ECB:
+			bytes = decryptEcb(bytes, "My secret key!!!")
+		ENCRYPTIONMODE.CBC:
+			bytes = decryptCbc(bytes, "My secret key!!!", "My secret iv!!!!")
+
+	var data = bytesToVar(bytes)
+	print("Game loaded from: " + path)
+	return data
+
+# ============================================================================
+# CONFIG FUNCTIONS
+# ============================================================================
+
+## Saves the configuration settings to a file named "settings.ini"
+func saveConfig(settings: Dictionary) -> void:
+	var c: ConfigFile = ConfigFile.new()
+	for section: String in settings.keys():
+		if settings[section] is Dictionary:
+			for key: String in settings[section]:
+				c.set_value(section, key, settings[section][key])
+	c.save("user://settings.ini")
+
+## Loads the configuration settings from the "settings.ini" file
+func loadConfig(settings: Dictionary):
+	var c: ConfigFile = ConfigFile.new()
+	var err: Error = c.load("user://settings.ini")
+	if err != OK:
+		push_error("Error loading settings")
+		return
+
+	for section: String in settings.keys():
+		if settings[section] is Dictionary:
+			for key: String in settings[section]:
+				settings[section][key] = c.get_value(section, key, settings[section][key])
+
+# ============================================================================
+# GDL MODULE INTERFACE
+# ============================================================================
+
+## Override to list exported functions
+func get_exported_functions() -> Array[String]:
+	return [
+		# Logging functions
+		"rainbowLog", "flashLog", "gradientLog", "highlightLog", "delayCall",
+		# Debugging functions
+		"printPretty", "getValueColor", "valueToString", "printType",
+		# Performance monitoring
+		"logMemoryUsage", "logVRAMUsage", "logRenderingStats", "logFPS",
+		# File I/O
+		"writeJsonFile", "readJsonFile",
+		# Encryption
+		"padData", "removePadding", "xorEncryptDecrypt", "encryptCbc", "decryptCbc", "encryptEcb", "decryptEcb",
+		# Data conversion
+		"varToBytes", "bytesToVar",
+		# Save/Load
+		"saveGame", "loadGame",
+		# Config
+		"saveConfig", "loadConfig"
+	]
+
+## Override to list exported variables/enums
+func get_exported_variables() -> Array[String]:
+	return ["ENCRYPTIONMODE"]
+
+## Module initialization
+func _gdl_init():
+	super._gdl_init()
+	print("UtilsGDL module initialized with %d functions" % get_exported_functions().size())
+
+## Module cleanup
+func _gdl_cleanup():
+	if aes:
+		aes.finish()
+	super._gdl_cleanup()
