@@ -320,6 +320,9 @@ extends GDLModule
 func _init():
 	module_name = "%s"
 	module_version = "1.0.0"
+	author = "Unknown"
+	description = "library description"
+	dependencies = []
 
 func get_exported_functions() -> Array[String]:
 	return ["hello_world"]

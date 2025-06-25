@@ -1,0 +1,19 @@
+
+# @gdl:name: testlibrary
+# @gdl:version: 1.0.0
+# @gdl:author: Unknown
+
+extends GDLModule
+
+func _init():
+	module_name = "testlibrary"
+	module_version = "1.0.0"
+	author = "Unknown"
+	description = "library description"
+	dependencies = ["Utils"]
+
+func get_exported_functions() -> Array[String]:
+	return ["hello_world"]
+
+func hello_world() -> String:
+	return "Hello from testlibrary!"
