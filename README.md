@@ -1,142 +1,118 @@
 # GDLibrary
 
-**GDLibrary** is a pure GDScript system for building reusable, distributable libraries—similar to DLLs—directly in Godot Engine. It allows you to define, export, load, and package modular `.gdl` files and convert them into binary `.gdlb` format for efficient use and distribution.
+**Distribute GDScript classes and assets in a single `.gdlib` file.** Once a library is imported, its public classes are available in Godot’s script editor with autocomplete, type checking and method signatures.
 
-**Note:** While Godot already has an existing plugin system, I created GDLibrary to build my own custom library system tailored specifically for modular GDScript code reuse and distribution.
+GDLibrary 2.5.4 is a pure GDScript editor add-on tested with Godot 4.7.2. A package contains compressed GDScript and its source can be recovered.
 
----
+## Install the add-on
 
-## 🚀 Features
+1. Open your own Godot project. Copy [addons/gdlibrary](addons/gdlibrary/) into it so the plugin file is at `res://addons/gdlibrary/plugin.cfg`.
+2. Open **Project → Project Settings → Plugins** and enable **GDLibrary**.
+3. GDLibrary creates `res://libraries/` automatically. Drop any `.gdlib` packages you receive there, along with their required packages. Other imported project folders also work.
 
-- 📦 Define modular libraries using `.gdl` files
-- 🔐 Package them into `.gdlb` binary format with compression and checksums
-- 🧠 Load libraries dynamically at runtime
-- 📁 Compatible with `.pck` packaging
-- 💡 No C++, GDExtension, or plugins required—just GDScript
+Select a `.gdlib` in the **FileSystem** dock. Its Inspector shows the **Package ID**, **Status**, **Public classes**, dependencies and asset paths. When the status is **Ready**, use the names under **Public classes** in your scripts. The package ID is what you use for dependency declarations and asset lookups.
 
----
+## Create your first library
 
-## 📁 Installation
+This example creates a package named `BoardGames` and calls `BoardGames.Dice.total(2, 3)` from another project.
 
-1. Clone or download the repository.
-2. Add the `GDLibrary` folder to your Godot project.
-3. In **Project Settings → Global**, add the `GDL_Core.gd` script as a global singleton named `GDL_Core`.
+### In the author project
 
-   Example:
-
-   | Path                            | Name       | Enabled |
-   |----------------------------------|------------|---------|
-   | `res://GDLibrary/GDL_Core.gd`   | `GDL_Core` | ✅       |
-
-4. You're now ready to create and load `.gdl` libraries.
-
----
-
-## 📚 Creating a New GDL Library
-
-To create a new module (library), run the following GDScript commands:
+1. Install the add-on as described above. Create `res://dice.gd` with the following contents and save it.
 
 ```gdscript
-GDL_Core.create_gdl_module("testModule")
-GDL_Core.export_module_source("testModule")
-```
+   extends RefCounted
 
-This creates a new file at res://gdl_modules/testModule.gdl with:
+   static func total(first: int, second: int) -> int:
+   	return first + second
+   ```
 
-- Metadata block (name, version, dependencies, exports)
+2. Right-click `dice.gd` in the FileSystem dock and choose **Pack as Library…**. You can also use **Project → Tools → Pack GDScript Library…** or the command palette.
+3. Set **Package ID** to `BoardGames`, **Version** to `1.0.0`, and enable **Use package ID as a namespace**. The filename `dice.gd` gives this script the public name `Dice`.
+4. Click **Validate**, then **Choose Destination…**. Save `BoardGames.gdlib` in a `dist` folder beside the author project. GDLibrary also saves `res://gdlib\_definitions/BoardGames.gdlib.tres` inside the project for future repacks.
 
-- Function stubs
+### In the consuming project
 
-- Ready for editing
-
-You can now open and modify testModule.gdl like any other GDScript file.
-
----
-## 🚀 Loading a Module at Runtime
-Once a `.gdlb` or `.gdlb` file is in res://gdl_modules/, you can load it:
+1. Enable GDLibrary, copy `BoardGames.gdlib` into the automatically created `res://libraries/` folder and let Godot finish importing.
+2. Create a scene with a `Node` root, attach the script below, save the scene and press **F6**. The Output panel should print `5`.
 
 ```gdscript
-var test = GDL_Core.get_module("testModule")
-test.some_function()
-```
+   extends Node
 
-get_module("name") returns the loaded module (as a script instance) or loads it if not already active.
+   func \_ready() -> void:
+   	print(BoardGames.Dice.total(2, 3))
+   ```
 
----
+## Package options and updates
 
-## 📤 Compiling Modules for Distribution
+* **Public names.** A script uses its declared `class\_name`, or its filename in PascalCase. With namespaces enabled, `BoardGames.Dice` and `Casino.Dice` can coexist. With namespaces off, each public class is registered by its own name. Generated namespace aliases suppress the `shadowed\_global\_identifier` warning if an alias shares a name with a global class.
+* **Multiple scripts.** Use **Add scripts…** to include classes and **Toggle public/private** for implementation helpers. Each package needs at least one public script.
+* **Package IDs.** Use letters, digits or underscores, starting with a letter or underscore. Consumers can use **Copy Package ID** in the Inspector.
+* **Repacking.** Right-click the saved definition and choose **Repack Library**. If public declarations changed, the editor shows the differences before replacing the previous package. Distribute the resulting `.gdlib`, its required packages and any assets you chose to keep external.
 
-To convert all `.gdl` source files into `.gdlb` binaries:
+## Dependencies
 
-```gdscript
-GDL_Core.convert_all_gdl_to_binary()
-```
+Use **Add installed dependency** or enter comma-separated requirements. Version checks use the package ID recorded inside each file.
 
-This compresses and saves .gdlb files alongside the originals for shipping in .pck or .zip exports.
+|Requirement|Accepted versions|
+|-|-|
+|`GatorMath`|Any installed version|
+|`GatorMath@1.2.0`|Exactly 1.2.0|
+|`GatorMath@^1.2.0`|1.2.0 up to, but excluding, 2.0.0|
+|`GatorMath@^0.3.1`|0.3.1 up to, but excluding, 0.4.0|
 
----
+Open **Project → Tools → GDLibrary Dependencies…** to find missing packages, incompatible versions, duplicate IDs or dependency cycles.
 
-## 📦 Using in Exported Projects
+## Textures and other assets
 
-- .gdlb files are fully compatible with .pck exports.
+|How the library uses an asset|What to pack|
+|-|-|
+|A script uses a literal path such as `preload("res://cards/ace.png")`|Enable **Embed referenced resources**. The packer follows the reference and its resource dependencies.|
+|A function builds a path from a card ID at runtime|Use **Additional asset files and folders… → Add folder…** and select `res://cards/`. This enables embedding and includes supported files recursively.|
+|You distribute assets separately|Leave embedding off and supply the required assets at the project-relative paths shown in the Inspector.|
 
-- As long as the binary is present in res://gdl_modules/, it can be loaded like any other module.
-
-- Source `.gdl` files are prioritized in editor, but `.gdlb` will be used in release builds if source is missing.
-
----
-
-## 🔍 Checking for Module Dependencies
-At runtime, you can check if those dependencies are loaded:
-
-```gdscript
-check_dependencies()
-```
-
-This returns true if all required modules are loaded, otherwise logs which are missing.
-
-## 📚 Example
+For an embedded folder, use the package ID and the original path relative to `res://`. For example, a package with ID `CardArt` can load a card by name:
 
 ```gdscript
-func _ready():
-	var utils = GDL_Core.get_module("Utils")
-	if utils and utils.check_dependencies():
-		utils.rainbow_log("Hello from GDLibrary!")
+static func card\_texture(card\_id: String) -> Texture2D:
+	var path := GDLibraryAssets.path("CardArt", "cards/%s.png" % card\_id)
+	return load(path) as Texture2D
 ```
 
----
+With `CardArt` installed, the path for `ace` resolves to `res://gdlib\_assets/CardArt/cards/ace.png`. If it resolves to `res://cards/ace.png` in a consumer project, check the installed package’s **Package ID** and **Embedded resources** in the Inspector. **Copy Package ID** gives you the exact spelling.
 
-## 📂 GDL File Format (Binary Overview)
-.gdlb files are compiled containers with:
+Supported assets include textures, audio, fonts, text scenes and resources, and self-contained binary scenes and resources. For scenes with attached GDScripts, add the scripts with **Add scripts…**. Asset folders skip `.gd` files. The [embedded resource handler](addons/gdlibrary/embedded.gd) lists the supported extensions.
 
-- Magic header: GDL\x01
+## Test, export and debug
 
-- File version and timestamp
+* **Test a package in isolation.** Select the `.gdlib` and click **Test in Clean Project**. GDLibrary creates a disposable consumer, imports the package and dependencies, checks public classes and resources, then repeats the checks in an exported PCK. For an external distribution, put its required packages beside it or in an adjacent `libraries/` folder.
+* **Export a game.** Export through Godot as usual. For a preset that exports only selected scenes or resources, open **Project → Tools → GDLibrary Export Presets…**, apply **Fix Export Preset**, and reopen the editor before exporting. This includes bindings and assets reached only at runtime.
+* **Trace a runtime error.** Copy a stack frame from a package built with 2.5 or later. In the matching author project, open **Project → Tools → Go to GDLibrary Source…** and paste it to jump to the original script and line.
+* **First import.** A scene that already references a packaged class can briefly report an unknown identifier while Godot registers the generated classes. Let the import finish. If the error persists, check the package’s status and dependencies.
 
-- Sections:
+### Command line
 
- - metadata: Dictionary (name, version, exports, dependencies)
+Run these commands with the Godot editor executable on your PATH. The first two use the BoardGames definition and output from the walkthrough. For the third, create an export preset in your project and substitute its name for `Linux`.
 
- - source_code: Compressed UTF-8 GDScript string
+```sh
+godot --headless --script res://addons/gdlibrary/release.gd -- pack res://gdlib\_definitions/BoardGames.gdlib.tres ../dist/BoardGames.gdlib
+godot --headless --script res://addons/gdlibrary/release.gd -- test ../dist/BoardGames.gdlib ../dist
+godot --headless --script res://addons/gdlibrary/release.gd -- export-pack Linux builds/game.pck
+```
 
- - exports: Dictionary or list of callable functions
+`pack` can compare against a specific previous release with `--baseline <previous.gdlib>`. A public API change returns exit code `3` and preserves the previous output. Review the differences and pass `--allow-api-changes` to accept them. `export-pack` takes an export preset name and verifies the PCK before publishing it.
 
- - dependencies: Array of required module names
+## Migrating from GDLibrary 1.x
 
- - resources: Optional embedded resources
+The original project used a `GDL\_Core` autoload, `.gdl` and `.gdlb` modules, and calls such as `GDL\_Core.get\_module("Utils")`. Those files require the original loader. To move a library to 2.5:
 
-- Checksums to validate integrity
+1. Move the reusable implementation into ordinary `.gd` scripts. Replace dependencies on `GDLModule` and move any work done in the old load or cleanup hooks into methods your application calls explicitly.
+2. Pack the scripts with the editor and declare the package dependencies. Update callers to use the public classes. For stateful modules, create and retain an instance where the old loader held one for you.
+3. Once all legacy callers are migrated, remove the old `GDL\_Core` autoload.
 
----
+GDLibrary 2.5.4 reads earlier **2.x** `.gdlib` packages. Consumers need **2.5 or newer** to import packages written by this version. This release packages libraries for editor import and game export. Loading player-supplied mods into an already-exported game is outside its current scope.
 
-## 🧪 Development Notes
-Source modules (.gdl) are editable and good for iteration.
+## License
 
-Binary modules (.gdlb) are preferred for release builds and protect source logic.
+[MIT License](LICENSE) · Blackwater Gator Studios
 
-Both formats can coexist in the same folder—.gdl takes precedence in the editor.
-
----
-
-## 📝 License
-MIT License — use freely in open-source or commercial projects. No credit required, but always appreciated!
