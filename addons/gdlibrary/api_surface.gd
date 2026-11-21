@@ -11,32 +11,32 @@ static func type_name(info: Dictionary) -> String:
 	return type_string(info.type)
 
 static func method_signature(method: Dictionary) -> Dictionary:
-	var args := PackedStringArray()
-	var names := PackedStringArray()
+	var args: PackedStringArray = PackedStringArray()
+	var names: PackedStringArray = PackedStringArray()
 	for arg: Dictionary in method.args:
 		args.append(type_name(arg))
 		names.append(String(arg.name))
-	var defaults := PackedStringArray()
+	var defaults: PackedStringArray = PackedStringArray()
 	for value: Variant in method.default_args:
 		defaults.append(var_to_str(value) if typeof(value) != TYPE_OBJECT else "Object")
 	return {"names": names, "args": args, "defaults": defaults, "return": type_name(method.return), "flags": int(method.flags) & (METHOD_FLAG_STATIC | METHOD_FLAG_VARARG)}
 
 static func record(script: GDScript, base: String, abstract_class: bool) -> Dictionary:
-	var result := {"class": {"base": base, "abstract": abstract_class}}
+	var result: Dictionary = {"class": {"base": base, "abstract": abstract_class}}
 	for method: Dictionary in script.get_script_method_list():
-		var name_ := String(method.name)
+		var name_: String = String(method.name)
 		if name_ == "_init" or (not name_.begins_with("_") and not name_.contains("@")):
 			result["func " + name_] = method_signature(method)
 	for signal_: Dictionary in script.get_script_signal_list():
 		if not String(signal_.name).begins_with("_"):
-			var args := PackedStringArray()
+			var args: PackedStringArray = PackedStringArray()
 			for arg: Dictionary in signal_.args:
 				args.append(type_name(arg))
 			result["signal " + String(signal_.name)] = args
 	for property: Dictionary in script.get_script_property_list():
 		if int(property.usage) & PROPERTY_USAGE_SCRIPT_VARIABLE and not String(property.name).begins_with("_"):
 			result["var " + String(property.name)] = type_name(property)
-	var constants := script.get_script_constant_map()
+	var constants: Dictionary = script.get_script_constant_map()
 	for key: StringName in constants:
 		if String(key).begins_with("_"):
 			continue
@@ -50,7 +50,7 @@ static func record(script: GDScript, base: String, abstract_class: bool) -> Dict
 	return result
 
 static func compare(old: Dictionary, current: Dictionary) -> PackedStringArray:
-	var lines := PackedStringArray()
+	var lines: PackedStringArray = PackedStringArray()
 	for name_: String in old:
 		if not current.has(name_):
 			lines.append("Removed public class " + name_)
@@ -58,7 +58,7 @@ static func compare(old: Dictionary, current: Dictionary) -> PackedStringArray:
 		var before: Dictionary = old[name_]
 		var after: Dictionary = current[name_]
 		for key: String in before:
-			var label := name_ + ("." + key.get_slice(" ", 1) if key != "class" else "")
+			var label: String = name_ + ("." + key.get_slice(" ", 1) if key != "class" else "")
 			if not after.has(key):
 				lines.append("Removed " + label)
 			elif before[key] != after[key]:
@@ -82,11 +82,11 @@ static func compare(old: Dictionary, current: Dictionary) -> PackedStringArray:
 	return lines
 
 static func describe(method: Dictionary) -> String:
-	var args := PackedStringArray(method.args)
+	var args: PackedStringArray = PackedStringArray(method.args)
 	var first: int = args.size() - method.defaults.size()
-	for i in args.size():
+	for i: int in args.size():
 		args[i] = String(method.names[i]) + ": " + args[i]
-	for i in method.defaults.size():
+	for i: int in method.defaults.size():
 		args[first + i] += " = " + str(method.defaults[i])
 	return ("static " if int(method.flags) & METHOD_FLAG_STATIC else "") + "(" + ", ".join(args) + ") -> " + String(method.return)
 

@@ -1,16 +1,16 @@
 @tool
 extends RefCounted
 
-const Package := preload("package.gd")
-const ROOT := Package.Embedded.ROOT
-const LEDGER := ROOT + ".gdlib-owned.json"
+const Package = preload("package.gd")
+const ROOT: String = Package.Embedded.ROOT
+const LEDGER: String = ROOT + ".gdlib-owned.json"
 
-var owned := {}
-var wanted := {}
-var changed := false
-var dirty := false
-var ledger_ok := true
-var issues := PackedStringArray()
+var owned: Dictionary = {}
+var wanted: Dictionary = {}
+var changed: bool = false
+var dirty: bool = false
+var ledger_ok: bool = true
+var issues: PackedStringArray = PackedStringArray()
 
 func _init() -> void:
 	if DirAccess.open("res://").is_link("gdlib_assets"):
@@ -27,9 +27,9 @@ func _init() -> void:
 func safe(path: String) -> bool:
 	if not path.begins_with(ROOT) or not Package.valid_asset_path(path):
 		return false
-	var current := "res://"
-	for part in path.trim_prefix("res://").split("/"):
-		var dir := DirAccess.open(current)
+	var current: String = "res://"
+	for part: String in path.trim_prefix("res://").split("/"):
+		var dir: DirAccess = DirAccess.open(current)
 		if dir != null and dir.is_link(part):
 			return false
 		current = current.path_join(part)
@@ -38,29 +38,29 @@ func safe(path: String) -> bool:
 func install(info: Dictionary) -> bool:
 	if not ledger_ok and not info.get("embedded", {}).is_empty():
 		return false
-	var writes := {}
-	var imports := {}
-	var import_keys := {}
+	var writes: Dictionary = {}
+	var imports: Dictionary = {}
+	var import_keys: Dictionary = {}
 	for source: String in info.get("embedded", {}):
-		var path := Package.Embedded.destination(info.id, source)
+		var path: String = Package.Embedded.destination(info.id, source)
 		wanted[path] = true
 		if info.get("imports", {}).has(source):
 			wanted[path + ".import"] = true
 	for source: String in info.get("embedded", {}):
-		var path := Package.Embedded.destination(info.id, source)
+		var path: String = Package.Embedded.destination(info.id, source)
 		var meta: Dictionary = info.embedded[source]
 		if not safe(path) or not safe(path + ".import"):
 			issues.append("Cannot install embedded asset at " + path)
 			return false
 		if info.get("imports", {}).has(source):
 			var settings: Dictionary = info.imports[source]
-			var key := path + ".import"
-			var digest := (String(meta.hash) + JSON.stringify(settings)).sha256_text()
+			var key: String = path + ".import"
+			var digest: String = (String(meta.hash) + JSON.stringify(settings)).sha256_text()
 			if owned.get(key, "") != digest or not preload("asset_import.gd").ready(path):
 				imports[path] = settings
 				import_keys[key] = digest
 		if FileAccess.file_exists(path):
-			var existing := FileAccess.get_sha256(path)
+			var existing: String = FileAccess.get_sha256(path)
 			if existing == meta.hash:
 				continue
 			if existing != owned.get(path, ""):
@@ -75,7 +75,7 @@ func install(info: Dictionary) -> bool:
 		owned[path] = meta.hash
 		changed = true
 		dirty = true
-	var error := preload("asset_import.gd").compile(imports)
+	var error: Error = preload("asset_import.gd").compile(imports)
 	if error != OK:
 		issues.append("%s could not prepare its embedded resources. %s" % [info.id, error_string(error)])
 		return false
@@ -93,7 +93,7 @@ func finish() -> void:
 			if DirAccess.remove_absolute(path) != OK:
 				issues.append("Cannot remove obsolete embedded asset " + path)
 				continue
-			for suffix in [".import", ".uid"]:
+			for suffix: String in [".import", ".uid"]:
 				if FileAccess.file_exists(path + suffix) and safe(path + suffix):
 					DirAccess.remove_absolute(path + suffix)
 			changed = true

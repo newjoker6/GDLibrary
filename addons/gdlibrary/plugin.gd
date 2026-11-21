@@ -1,75 +1,76 @@
 @tool
 extends EditorPlugin
 
-const Package := preload("package.gd")
-const Importer := preload("importer.gd")
-const Exporter := preload("exporter.gd")
-const Catalog := preload("catalog.gd")
-const Definition := preload("definition.gd")
-const Validation := preload("validation.gd")
-const Presets := preload("preset_fixes.gd")
-const Inspector := preload("package_inspector.gd")
-const Context := preload("context_menu.gd")
-const LIBRARY_DIR := "res://libraries"
-const ACTION := "Pack GDScript Library…"
-const COMMAND := "gdlib/pack"
-const MOUNTER := "GDLibraryMounts"
-const MOUNT_SCRIPT := "res://addons/gdlibrary/mounts.gd"
+const SourceLookup = preload("source_lookup.gd")
+const Package = preload("package.gd")
+const Importer = preload("importer.gd")
+const Exporter = preload("exporter.gd")
+const Catalog = preload("catalog.gd")
+const Definition = preload("definition.gd")
+const Validation = preload("validation.gd")
+const Presets = preload("preset_fixes.gd")
+const Inspector = preload("package_inspector.gd")
+const Context = preload("context_menu.gd")
+const LIBRARY_DIR: String = "res://libraries"
+const ACTION: String = "Pack GDScript Library…"
+const COMMAND: String = "gdlib/pack"
+const MOUNTER: String = "GDLibraryMounts"
+const MOUNT_SCRIPT: String = "res://addons/gdlibrary/mounts.gd"
 
-var source_lookup := preload("source_lookup.gd").new()
-var importer := Importer.new()
-var exporter := Exporter.new()
-var catalog := Catalog.new()
+var source_lookup: SourceLookup = SourceLookup.new()
+var importer: Importer = Importer.new()
+var exporter: Exporter = Exporter.new()
+var catalog: Catalog = Catalog.new()
 var input_dialog: EditorFileDialog
 var output_dialog: EditorFileDialog
 var message_dialog: AcceptDialog
-var after_error := Callable()
-var bundle_dialog := ConfirmationDialog.new()
-var source_list := ItemList.new()
-var id_edit := LineEdit.new()
-var id_hint := Label.new()
-var overlapping_packages := PackedStringArray()
-var deps_edit := LineEdit.new()
-var installed_menu := MenuButton.new()
-var report_dialog := AcceptDialog.new()
-var report_text := TextEdit.new()
-var package_inspector := Inspector.new()
-var context_menu := Context.new()
-var namespace_option := CheckBox.new()
-var extra_assets := PackedStringArray()
-var extra_list := ItemList.new()
-var extra_button := Button.new()
-var extra_dialog := AcceptDialog.new()
-var embed_option := CheckBox.new()
-var api_dialog := ConfirmationDialog.new()
-var api_text := TextEdit.new()
-var pending_save := Callable()
-var version_edit := LineEdit.new()
-var recipe_path := ""
-var prior_output := ""
-var hidden_sources := PackedStringArray()
-var asset_dialog := ConfirmationDialog.new()
-var asset_list := TextEdit.new()
-var asset_continue := Callable()
+var after_error: Callable = Callable()
+var bundle_dialog: ConfirmationDialog = ConfirmationDialog.new()
+var source_list: ItemList = ItemList.new()
+var id_edit: LineEdit = LineEdit.new()
+var id_hint: Label = Label.new()
+var overlapping_packages: PackedStringArray = PackedStringArray()
+var deps_edit: LineEdit = LineEdit.new()
+var installed_menu: MenuButton = MenuButton.new()
+var report_dialog: AcceptDialog = AcceptDialog.new()
+var report_text: TextEdit = TextEdit.new()
+var package_inspector: Inspector = Inspector.new()
+var context_menu: Context = Context.new()
+var namespace_option: CheckBox = CheckBox.new()
+var extra_assets: PackedStringArray = PackedStringArray()
+var extra_list: ItemList = ItemList.new()
+var extra_button: Button = Button.new()
+var extra_dialog: AcceptDialog = AcceptDialog.new()
+var embed_option: CheckBox = CheckBox.new()
+var api_dialog: ConfirmationDialog = ConfirmationDialog.new()
+var api_text: TextEdit = TextEdit.new()
+var pending_save: Callable = Callable()
+var version_edit: LineEdit = LineEdit.new()
+var recipe_path: String = ""
+var prior_output: String = ""
+var hidden_sources: PackedStringArray = PackedStringArray()
+var asset_dialog: ConfirmationDialog = ConfirmationDialog.new()
+var asset_list: TextEdit = TextEdit.new()
+var asset_continue: Callable = Callable()
 var clean_picker: EditorFileDialog
-var clean_thread := Thread.new()
-var clean_timer := Timer.new()
-var validation_dialog := ConfirmationDialog.new()
-var pending_suggestions := PackedStringArray()
-var after_validation := Callable()
-var preset_dialog := AcceptDialog.new()
-var preset_rows := VBoxContainer.new()
-var picking_more := false
-var selected_sources := PackedStringArray()
-var library_dir_created := false
-var refresh_queued := false
-var attempted_imports := {}
-var last_issues := PackedStringArray()
+var clean_thread: Thread = Thread.new()
+var clean_timer: Timer = Timer.new()
+var validation_dialog: ConfirmationDialog = ConfirmationDialog.new()
+var pending_suggestions: PackedStringArray = PackedStringArray()
+var after_validation: Callable = Callable()
+var preset_dialog: AcceptDialog = AcceptDialog.new()
+var preset_rows: VBoxContainer = VBoxContainer.new()
+var picking_more: bool = false
+var selected_sources: PackedStringArray = PackedStringArray()
+var library_dir_created: bool = false
+var refresh_queued: bool = false
+var attempted_imports: Dictionary = {}
+var last_issues: PackedStringArray = PackedStringArray()
 
 func _enter_tree() -> void:
 	set_process(false)
 	if not DirAccess.dir_exists_absolute(LIBRARY_DIR):
-		var error := DirAccess.make_dir_absolute(ProjectSettings.globalize_path(LIBRARY_DIR))
+		var error: Error = DirAccess.make_dir_absolute(ProjectSettings.globalize_path(LIBRARY_DIR))
 		library_dir_created = error == OK
 		if not library_dir_created and not DirAccess.dir_exists_absolute(LIBRARY_DIR):
 			push_warning("GDLibrary could not create %s: %s" % [LIBRARY_DIR, error_string(error)])
@@ -80,10 +81,10 @@ func _enter_tree() -> void:
 	add_export_plugin(exporter)
 	if not ProjectSettings.has_setting("autoload/" + MOUNTER):
 		add_autoload_singleton(MOUNTER, MOUNT_SCRIPT)
-		var mount_key := "autoload/" + MOUNTER
-		var earliest := ProjectSettings.get_order(mount_key)
+		var mount_key: String = "autoload/" + MOUNTER
+		var earliest: int = ProjectSettings.get_order(mount_key)
 		for setting: Dictionary in ProjectSettings.get_property_list():
-			var key := String(setting.name)
+			var key: String = String(setting.name)
 			if key.begins_with("autoload/") and key != mount_key:
 				earliest = mini(earliest, ProjectSettings.get_order(key) - 1)
 		ProjectSettings.set_order(mount_key, earliest)
@@ -129,7 +130,7 @@ func _enter_tree() -> void:
 	api_dialog.add_child(api_text)
 	add_child(api_dialog)
 	api_dialog.confirmed.connect(func() -> void:
-		var action := pending_save
+		var action: Callable = pending_save
 		pending_save = Callable()
 		if action.is_valid():
 			action.call()
@@ -161,20 +162,20 @@ func _enter_tree() -> void:
 	add_tool_menu_item("GDLibrary Dependencies…", show_report)
 	add_tool_menu_item(ACTION, choose_source)
 	EditorInterface.get_command_palette().add_command(ACTION, COMMAND, choose_source)
-	var filesystem := EditorInterface.get_resource_filesystem()
+	var filesystem: EditorFileSystem = EditorInterface.get_resource_filesystem()
 	filesystem.filesystem_changed.connect(queue_refresh)
 	filesystem.resources_reimported.connect(on_reimported)
 	queue_refresh()
 
 func inspect_selection() -> void:
-	var paths := EditorInterface.get_selected_paths()
+	var paths: PackedStringArray = EditorInterface.get_selected_paths()
 	if paths.size() == 1 and paths[0].get_extension().to_lower() == "gdlib" and ResourceLoader.exists(paths[0]):
-		var asset := ResourceLoader.load(paths[0])
+		var asset: Resource = ResourceLoader.load(paths[0])
 		if asset != null and asset.has_meta("gdlib") and EditorInterface.get_inspector().get_edited_object() != asset:
 			EditorInterface.edit_resource(asset)
 
 func owns_mounter() -> bool:
-	var path := String(ProjectSettings.get_setting("autoload/" + MOUNTER, "")).trim_prefix("*")
+	var path: String = String(ProjectSettings.get_setting("autoload/" + MOUNTER, "")).trim_prefix("*")
 	if path.begins_with("uid://"):
 		path = ResourceUID.get_id_path(ResourceUID.text_to_id(path))
 	return path == MOUNT_SCRIPT
@@ -189,10 +190,10 @@ func _exit_tree() -> void:
 	if clean_thread.is_started():
 		clean_thread.wait_to_finish()
 	if DisplayServer.get_name() == "headless":
-		var error := preload("cold_import.gd").finish(catalog)
+		var error: Error = preload("cold_import.gd").finish(catalog)
 		if error != OK:
 			push_error("GDLibrary could not finalize the script class index: " + error_string(error))
-	var filesystem := EditorInterface.get_resource_filesystem()
+	var filesystem: EditorFileSystem = EditorInterface.get_resource_filesystem()
 	filesystem.filesystem_changed.disconnect(queue_refresh)
 	filesystem.resources_reimported.disconnect(on_reimported)
 	remove_tool_menu_item("GDLibrary Dependencies…")
@@ -206,7 +207,7 @@ func _exit_tree() -> void:
 	remove_export_plugin(exporter)
 
 func make_dialog(title_text: String, mode: EditorFileDialog.FileMode, access: EditorFileDialog.Access, pattern: String, description: String) -> EditorFileDialog:
-	var dialog := EditorFileDialog.new()
+	var dialog: EditorFileDialog = EditorFileDialog.new()
 	dialog.title = title_text
 	dialog.access = access
 	dialog.file_mode = mode
@@ -220,10 +221,10 @@ func make_dialog(title_text: String, mode: EditorFileDialog.FileMode, access: Ed
 func setup_bundle_dialog() -> void:
 	bundle_dialog.title = "Pack GDScript Library"
 	bundle_dialog.get_ok_button().text = "Choose Destination…"
-	var scroll := ScrollContainer.new()
+	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.follow_focus = true
 	bundle_dialog.add_child(scroll)
-	var layout := VBoxContainer.new()
+	var layout: VBoxContainer = VBoxContainer.new()
 	layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(layout)
 	add_field(layout, "Package ID", id_edit)
@@ -245,17 +246,17 @@ func setup_bundle_dialog() -> void:
 	add_field(layout, "Included scripts", source_list)
 	source_list.custom_minimum_size.y = 145
 	source_list.select_mode = ItemList.SELECT_MULTI
-	var actions := HBoxContainer.new()
+	var actions: HBoxContainer = HBoxContainer.new()
 	layout.add_child(actions)
-	var add := Button.new()
+	var add: Button = Button.new()
 	add.text = "Add scripts…"
 	add.pressed.connect(pick_more)
 	actions.add_child(add)
-	var remove := Button.new()
+	var remove: Button = Button.new()
 	remove.text = "Remove selected"
 	remove.pressed.connect(remove_sources)
 	actions.add_child(remove)
-	var toggle := Button.new()
+	var toggle: Button = Button.new()
 	toggle.text = "Toggle public/private"
 	toggle.pressed.connect(toggle_visibility)
 	actions.add_child(toggle)
@@ -264,7 +265,7 @@ func setup_bundle_dialog() -> void:
 	installed_menu.text = "Add installed dependency"
 	layout.add_child(installed_menu)
 	installed_menu.get_popup().id_pressed.connect(add_installed_dependency)
-	var check := bundle_dialog.add_button("Validate", true)
+	var check: Button = bundle_dialog.add_button("Validate", true)
 	check.pressed.connect(func() -> void: validate_for(validation_passed))
 	bundle_dialog.confirmed.connect(choose_destination)
 	add_child(bundle_dialog)
@@ -272,27 +273,27 @@ func setup_bundle_dialog() -> void:
 func setup_asset_inputs() -> void:
 	extra_dialog.title = "Additional package assets"
 	extra_dialog.get_ok_button().text = "Done"
-	var layout := VBoxContainer.new()
+	var layout: VBoxContainer = VBoxContainer.new()
 	extra_dialog.add_child(layout)
-	var hint := Label.new()
+	var hint: Label = Label.new()
 	hint.text = "Folders skip .gd files. Use Add scripts… to include a class."
 	layout.add_child(hint)
 	extra_list.custom_minimum_size = Vector2(450, 130)
 	extra_list.select_mode = ItemList.SELECT_MULTI
 	layout.add_child(extra_list)
-	var row := HBoxContainer.new()
+	var row: HBoxContainer = HBoxContainer.new()
 	layout.add_child(row)
-	var files := make_dialog("Select asset files", EditorFileDialog.FILE_MODE_OPEN_FILES, EditorFileDialog.ACCESS_RESOURCES, "", "")
-	var folder := make_dialog("Select an asset folder", EditorFileDialog.FILE_MODE_OPEN_DIR, EditorFileDialog.ACCESS_RESOURCES, "", "")
+	var files: EditorFileDialog = make_dialog("Select asset files", EditorFileDialog.FILE_MODE_OPEN_FILES, EditorFileDialog.ACCESS_RESOURCES, "", "")
+	var folder: EditorFileDialog = make_dialog("Select an asset folder", EditorFileDialog.FILE_MODE_OPEN_DIR, EditorFileDialog.ACCESS_RESOURCES, "", "")
 	files.files_selected.connect(add_asset_inputs)
 	folder.dir_selected.connect(func(path: String) -> void: add_asset_inputs(PackedStringArray([path])))
 	for picker: EditorFileDialog in [files, folder]:
-		var button := Button.new()
+		var button: Button = Button.new()
 		button.text = "Add files…" if picker == files else "Add folder…"
 		button.pressed.connect(pick_extra_assets.bind(picker))
 		picker.canceled.connect(func() -> void: extra_dialog.popup_centered.call_deferred())
 		row.add_child(button)
-	var remove := Button.new()
+	var remove: Button = Button.new()
 	remove.text = "Remove selected"
 	remove.pressed.connect(remove_asset_inputs)
 	row.add_child(remove)
@@ -310,8 +311,8 @@ func pick_extra_assets(picker: EditorFileDialog) -> void:
 	picker.popup_centered_ratio(0.65)
 
 func add_asset_inputs(paths: PackedStringArray) -> void:
-	for path in paths:
-		var normalized := path.trim_suffix("/") if path != "res://" else path
+	for path: String in paths:
+		var normalized: String = path.trim_suffix("/") if path != "res://" else path
 		if not extra_assets.has(normalized):
 			extra_assets.append(normalized)
 	embed_option.button_pressed = true
@@ -319,15 +320,15 @@ func add_asset_inputs(paths: PackedStringArray) -> void:
 	extra_dialog.popup_centered.call_deferred()
 
 func remove_asset_inputs() -> void:
-	var indexes := extra_list.get_selected_items()
+	var indexes: PackedInt32Array = extra_list.get_selected_items()
 	indexes.reverse()
-	for index in indexes:
+	for index: int in indexes:
 		extra_assets.remove_at(index)
 	refresh_asset_inputs()
 
 func refresh_asset_inputs() -> void:
 	extra_list.clear()
-	for path in extra_assets:
+	for path: String in extra_assets:
 		extra_list.add_item(path + ("/" if DirAccess.dir_exists_absolute(path) else ""))
 	extra_button.text = "Additional asset files and folders… (%d)" % extra_assets.size()
 
@@ -336,14 +337,14 @@ func update_id_hint(value: String) -> void:
 	id_hint.visible = not id_hint.text.is_empty()
 
 func add_field(layout: VBoxContainer, caption: String, control: Control) -> void:
-	var label := Label.new()
+	var label: Label = Label.new()
 	label.text = caption
 	layout.add_child(label)
 	layout.add_child(control)
 
 func choose_source() -> void:
-	var paths := PackedStringArray()
-	for path in EditorInterface.get_selected_paths():
+	var paths: PackedStringArray = PackedStringArray()
+	for path: String in EditorInterface.get_selected_paths():
 		if path.get_extension().to_lower() == "gd":
 			paths.append(path)
 	start_pack(paths)
@@ -373,27 +374,27 @@ func pick_more() -> void:
 	input_dialog.popup_centered_ratio(0.65)
 
 func remove_sources() -> void:
-	var selected := source_list.get_selected_items()
+	var selected: PackedInt32Array = source_list.get_selected_items()
 	selected.reverse()
-	for index in selected:
+	for index: int in selected:
 		hidden_sources.erase(selected_sources[index])
 		selected_sources.remove_at(index)
 		source_list.remove_item(index)
 
 func select_sources(paths: PackedStringArray) -> void:
 	input_dialog.hide()
-	for path in paths:
+	for path: String in paths:
 		if not selected_sources.has(path):
 			selected_sources.append(path)
 			source_list.add_item(path.trim_prefix("res://") + ("  [private]" if hidden_sources.has(path) else ""))
 	if id_edit.text.is_empty() and not selected_sources.is_empty():
-		var first := selected_sources[0]
+		var first: String = selected_sources[0]
 		if selected_sources.size() == 1:
-			var declaration := Package.global_declaration(FileAccess.get_file_as_string(first))
+			var declaration: RegExMatch = Package.global_declaration(FileAccess.get_file_as_string(first))
 			id_edit.text = declaration.get_string(1) if declaration != null else first.get_file().get_basename().to_pascal_case()
-	var popup := installed_menu.get_popup()
+	var popup: PopupMenu = installed_menu.get_popup()
 	popup.clear()
-	for id in catalog.package_ids:
+	for id: String in catalog.package_ids:
 		popup.add_item(id)
 	installed_menu.disabled = popup.item_count == 0
 	picking_more = false
@@ -401,35 +402,35 @@ func select_sources(paths: PackedStringArray) -> void:
 	show_pack_form()
 
 func add_installed_dependency(index: int) -> void:
-	var id := installed_menu.get_popup().get_item_text(index)
-	var ids := dependency_ids()
+	var id: String = installed_menu.get_popup().get_item_text(index)
+	var ids: PackedStringArray = dependency_ids()
 	if not ids.has(id):
 		ids.append(id)
 	deps_edit.text = ", ".join(ids)
 
 func dependency_ids() -> PackedStringArray:
-	var result := PackedStringArray()
-	for entry in deps_edit.text.split(",", false):
-		var id := entry.strip_edges()
+	var result: PackedStringArray = PackedStringArray()
+	for entry: String in deps_edit.text.split(",", false):
+		var id: String = entry.strip_edges()
 		if not id.is_empty() and not result.has(id):
 			result.append(id)
 	return result
 
 func resume_after_error() -> void:
-	var action := after_error
+	var action: Callable = after_error
 	after_error = Callable()
 	if action.is_valid():
 		action.call_deferred()
 
-func show_error(details: String, next := Callable()) -> void:
+func show_error(details: String, next: Callable = Callable()) -> void:
 	after_error = next
 	message_dialog.title = "Library packing"
 	message_dialog.dialog_text = details
 	message_dialog.popup_centered()
 
 func toggle_visibility() -> void:
-	for index in source_list.get_selected_items():
-		var path := selected_sources[index]
+	for index: int in source_list.get_selected_items():
+		var path: String = selected_sources[index]
 		if hidden_sources.has(path):
 			hidden_sources.erase(path)
 		else:
@@ -437,7 +438,7 @@ func toggle_visibility() -> void:
 		source_list.set_item_text(index, path.trim_prefix("res://") + ("  [private]" if hidden_sources.has(path) else ""))
 
 func form_recipe() -> Resource:
-	var recipe := Definition.new()
+	var recipe: Definition = Definition.new()
 	recipe.namespace_enabled = namespace_option.button_pressed
 	recipe.embed_resources = embed_option.button_pressed
 	recipe.asset_inputs = extra_assets.duplicate()
@@ -450,7 +451,7 @@ func form_recipe() -> Resource:
 	return recipe
 
 func fill_form(path: String) -> bool:
-	var recipe := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE) as Definition
+	var recipe: Definition = ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_REPLACE) as Definition
 	if recipe == null:
 		show_error("Unable to open library definition " + path)
 		return false
@@ -484,7 +485,7 @@ func notice(text: String) -> void:
 	EditorInterface.get_editor_toaster().push_toast(text)
 
 func validate_for(next: Callable) -> void:
-	var result := Validation.review(form_recipe(), catalog, EditorInterface.get_script_editor().get_unsaved_files())
+	var result: Dictionary = Validation.review(form_recipe(), catalog, EditorInterface.get_script_editor().get_unsaved_files())
 	overlapping_packages = result.overlaps
 	if not result.errors.is_empty():
 		bundle_dialog.hide()
@@ -495,8 +496,8 @@ func validate_for(next: Callable) -> void:
 		after_validation = next
 		pending_suggestions = PackedStringArray(result.suggestions.keys())
 		pending_suggestions.sort()
-		var lines := PackedStringArray()
-		for id in pending_suggestions:
+		var lines: PackedStringArray = PackedStringArray()
+		for id: String in pending_suggestions:
 			lines.append("%s uses a class from %s." % [result.suggestions[id], id])
 		validation_dialog.dialog_text = "\n".join(lines)
 		validation_dialog.popup_centered()
@@ -519,8 +520,8 @@ func validation_passed() -> void:
 		notice("Ready to pack. Save outside this project or in a .gdignore folder. Installed packages share public classes: " + ", ".join(overlapping_packages))
 
 func show_pack_form() -> void:
-	var editor_size := EditorInterface.get_base_control().get_viewport_rect().size
-	var preferred := Vector2(550, 620) * EditorInterface.get_editor_scale()
+	var editor_size: Vector2 = EditorInterface.get_base_control().get_viewport_rect().size
+	var preferred: Vector2 = Vector2(550, 620) * EditorInterface.get_editor_scale()
 	bundle_dialog.min_size = Vector2i(preferred.min(editor_size * 0.9))
 	bundle_dialog.popup_centered(bundle_dialog.min_size)
 
@@ -529,7 +530,7 @@ func reopen_form() -> void:
 
 func accept_suggestions() -> void:
 	validation_dialog.hide()
-	var deps := dependency_ids()
+	var deps: PackedStringArray = dependency_ids()
 	deps.append_array(pending_suggestions)
 	deps_edit.text = ", ".join(deps)
 	pending_suggestions.clear()
@@ -552,53 +553,53 @@ func save_library(path: String) -> void:
 	output_dialog.hide()
 	if path.get_extension().is_empty():
 		path += ".gdlib"
-	var recipe := form_recipe()
+	var recipe: Resource = form_recipe()
 	recipe.output_path = ProjectSettings.localize_path(path)
 	if recipe.output_path.get_extension().to_lower() != "gdlib":
 		show_error("Choose a .gdlib output file.")
 		return
-	var target := recipe_path
+	var target: String = recipe_path
 	if target.is_empty():
 		target = "res://gdlib_definitions/" + String(recipe.package_id) + ".gdlib.tres"
 		if FileAccess.file_exists(target):
 			show_error("A definition already exists at %s. Open it and choose Edit Library Definition or Repack Library." % target)
 			return
-	var err := DirAccess.make_dir_recursive_absolute(target.get_base_dir())
+	var err: Error = DirAccess.make_dir_recursive_absolute(target.get_base_dir())
 	if err != OK:
 		show_error(error_string(err))
 		return
-	var result := Validation.review(recipe, catalog, EditorInterface.get_script_editor().get_unsaved_files())
+	var result: Dictionary = Validation.review(recipe, catalog, EditorInterface.get_script_editor().get_unsaved_files())
 	if not result.errors.is_empty() or not result.suggestions.is_empty():
 		show_error("The inputs changed. Validate again.\n" + "\n".join(result.errors))
 		return
-	var problem := Validation.destination_error(recipe.package_id, recipe.output_path, catalog, result)
+	var problem: String = Validation.destination_error(recipe.package_id, recipe.output_path, catalog, result)
 	if not problem.is_empty():
 		show_error(problem, pick_destination)
 		return
-	var staging := DirAccess.create_temp("gdlib-candidate")
+	var staging: DirAccess = DirAccess.create_temp("gdlib-candidate")
 	if staging == null:
 		show_error("Could not create a temporary package.")
 		return
-	var candidate := staging.get_current_dir().path_join("candidate.gdlib")
+	var candidate: String = staging.get_current_dir().path_join("candidate.gdlib")
 	err = Package.pack_definition(recipe, candidate)
 	if err != OK:
 		show_error("Could not pack %s. %s" % [recipe.package_id, error_string(err)], reopen_form)
 		return
-	var destination_hash := FileAccess.get_sha256(recipe.output_path) if FileAccess.file_exists(recipe.output_path) else ""
-	var original := 0
+	var destination_hash: String = FileAccess.get_sha256(recipe.output_path) if FileAccess.file_exists(recipe.output_path) else ""
+	var original: int = 0
 	var inputs: PackedStringArray = recipe.sources.duplicate()
 	if recipe.embed_resources:
 		for asset: String in result.assets:
 			if not inputs.has(asset):
 				inputs.append(asset)
-	for input in inputs:
-		var source := FileAccess.open(input, FileAccess.READ)
+	for input: String in inputs:
+		var source: FileAccess = FileAccess.open(input, FileAccess.READ)
 		if source != null:
 			original += source.get_length()
-	var publish := publish_candidate.bind(recipe, target, staging, destination_hash, original)
-	var baseline := String(recipe.output_path) if not destination_hash.is_empty() else prior_output
+	var publish: Callable = publish_candidate.bind(recipe, target, staging, destination_hash, original)
+	var baseline: String = String(recipe.output_path) if not destination_hash.is_empty() else prior_output
 	if not baseline.is_empty() and FileAccess.file_exists(baseline):
-		var changes := Package.api_changes(recipe.package_id, baseline, candidate)
+		var changes: PackedStringArray = Package.api_changes(recipe.package_id, baseline, candidate)
 		if not changes.is_empty():
 			api_text.text = "\n".join(changes)
 			pending_save = publish
@@ -607,16 +608,16 @@ func save_library(path: String) -> void:
 	publish.call()
 
 func publish_candidate(recipe: Resource, target: String, staging: DirAccess, expected: String, original: int) -> void:
-	var path := String(recipe.output_path)
-	var current := FileAccess.get_sha256(path) if FileAccess.file_exists(path) else ""
+	var path: String = String(recipe.output_path)
+	var current: String = FileAccess.get_sha256(path) if FileAccess.file_exists(path) else ""
 	if current != expected:
 		show_error("The destination changed during the review. Repack to compare it again.", reopen_form)
 		return
-	var bytes := FileAccess.get_file_as_bytes(staging.get_current_dir().path_join("candidate.gdlib"))
+	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(staging.get_current_dir().path_join("candidate.gdlib"))
 	if bytes.is_empty():
 		show_error("The temporary package could not be read.", reopen_form)
 		return
-	var err := Package.write_bytes(path, bytes)
+	var err: Error = Package.write_bytes(path, bytes)
 	if err != OK:
 		show_error("Could not save %s. %s" % [path, error_string(err)], reopen_form)
 		return
@@ -626,29 +627,29 @@ func publish_candidate(recipe: Resource, target: String, staging: DirAccess, exp
 		return
 	recipe_path = target
 	prior_output = recipe.output_path
-	var packed := bytes.size()
+	var packed: int = bytes.size()
 	notice("%s • %d scripts • %d → %d bytes (%+.1f%%)" % [recipe.package_id, recipe.sources.size(), original, packed, 100.0 * (packed - original) / maxi(original, 1)])
 	EditorInterface.get_resource_filesystem().scan()
 
 func show_presets() -> void:
-	for child in preset_rows.get_children():
+	for child: Node in preset_rows.get_children():
 		preset_rows.remove_child(child)
 		child.queue_free()
-	var affected := Presets.missing()
+	var affected: Dictionary = Presets.missing()
 	if affected.is_empty():
-		var label := Label.new()
+		var label: Label = Label.new()
 		label.text = "No selected-export presets need the GDLibrary include filter."
 		preset_rows.add_child(label)
 	for section: String in affected:
 		var name_: String = affected[section]
-		var row := Button.new()
+		var row: Button = Button.new()
 		row.text = "Fix Export Preset — " + name_
 		row.pressed.connect(fix_preset.bind(section, name_))
 		preset_rows.add_child(row)
 	preset_dialog.popup_centered()
 
 func fix_preset(section: String, name_: String) -> void:
-	var error := Presets.fix(section, name_)
+	var error: Error = Presets.fix(section, name_)
 	preset_dialog.hide()
 	if error != OK:
 		show_error("Unable to update %s: %s" % [name_, error_string(error)])
@@ -661,10 +662,10 @@ func show_report() -> void:
 	report_dialog.popup_centered()
 
 func update_report() -> void:
-	var lines := catalog.status.duplicate()
+	var lines: PackedStringArray = catalog.status.duplicate()
 	if lines.is_empty():
 		lines.append("No libraries found.")
-	var fixes := Presets.missing()
+	var fixes: Dictionary = Presets.missing()
 	if not fixes.is_empty():
 		lines.append("Export presets needing a fix: " + ", ".join(fixes.values()) + ". Open Project → Tools → GDLibrary Export Presets…")
 	if not catalog.issues.is_empty():
@@ -673,7 +674,7 @@ func update_report() -> void:
 	report_text.text = "\n".join(lines)
 
 func on_reimported(paths: PackedStringArray) -> void:
-	for path in paths:
+	for path: String in paths:
 		catalog.cache.erase(path)
 	queue_refresh()
 
@@ -683,7 +684,7 @@ func queue_refresh() -> void:
 		refresh.call_deferred()
 
 func _process(_delta: float) -> void:
-	var filesystem := EditorInterface.get_resource_filesystem()
+	var filesystem: EditorFileSystem = EditorInterface.get_resource_filesystem()
 	if not filesystem.is_scanning() and not filesystem.is_importing():
 		set_process(false)
 		queue_refresh()
@@ -692,26 +693,26 @@ func refresh() -> void:
 	refresh_queued = false
 	if not is_inside_tree():
 		return
-	var filesystem := EditorInterface.get_resource_filesystem()
+	var filesystem: EditorFileSystem = EditorInterface.get_resource_filesystem()
 	if filesystem.is_scanning() or filesystem.is_importing():
 		set_process(true)
 		return
-	var changed := catalog.refresh(filesystem)
+	var changed: bool = catalog.refresh(filesystem)
 	if report_dialog.visible:
 		update_report()
 	if last_issues != catalog.issues:
 		if not catalog.issues.is_empty():
 			EditorInterface.get_editor_toaster().push_toast(catalog.issues[0])
-		for issue in catalog.issues:
+		for issue: String in catalog.issues:
 			push_warning(issue)
 		last_issues = catalog.issues.duplicate()
 	if changed:
-		for path in catalog.touched:
+		for path: String in catalog.touched:
 			if filesystem.get_filesystem_path(path.get_base_dir()) != null:
 				filesystem.update_file(path)
-	var bindings := filesystem.get_filesystem_path(Catalog.API_DIR)
+	var bindings: EditorFileSystemDirectory = filesystem.get_filesystem_path(Catalog.API_DIR)
 	if DirAccess.dir_exists_absolute(Catalog.API_DIR):
-		for filename in DirAccess.get_files_at(Catalog.API_DIR):
+		for filename: String in DirAccess.get_files_at(Catalog.API_DIR):
 			if filename.get_extension() == "gd" and (bindings == null or bindings.find_file_index(filename) == -1):
 				changed = true
 				break
@@ -726,17 +727,17 @@ func refresh() -> void:
 		repair_failed_imports(filesystem)
 
 func repair_failed_imports(filesystem: EditorFileSystem) -> void:
-	var pending := PackedStringArray()
-	var failed := {}
+	var pending: PackedStringArray = PackedStringArray()
+	var failed: Dictionary = {}
 	for id: String in catalog.package_infos:
 		if catalog.package_states.get(id) != "Ready":
 			continue
 		var info: Dictionary = catalog.package_infos[id]
 		var path: String = info.path
-		var directory := filesystem.get_filesystem_path(path.get_base_dir())
+		var directory: EditorFileSystemDirectory = filesystem.get_filesystem_path(path.get_base_dir())
 		if directory == null:
 			continue
-		var index := directory.find_file_index(path.get_file())
+		var index: int = directory.find_file_index(path.get_file())
 		if index < 0 or directory.get_file_import_is_valid(index):
 			continue
 		var member: Dictionary = info.members[0]
@@ -757,10 +758,10 @@ func test_clean(path: String) -> void:
 	if clean_thread.is_started():
 		notice("A clean-project test is already running.")
 		return
-	var local := ProjectSettings.localize_path(path)
-	var assets_root := "res://" if Validation.imported_destination(local) else path.get_base_dir()
-	var args := PackedStringArray(["--headless", "--path", ProjectSettings.globalize_path("res://"), "--script", "res://addons/gdlibrary/release.gd", "--", "test", ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(assets_root)])
-	var error := clean_thread.start(run_clean_test.bind(OS.get_executable_path(), args))
+	var local: String = ProjectSettings.localize_path(path)
+	var assets_root: String = "res://" if Validation.imported_destination(local) else path.get_base_dir()
+	var args: PackedStringArray = PackedStringArray(["--headless", "--path", ProjectSettings.globalize_path("res://"), "--script", "res://addons/gdlibrary/release.gd", "--", "test", ProjectSettings.globalize_path(path), ProjectSettings.globalize_path(assets_root)])
+	var error: Error = clean_thread.start(run_clean_test.bind(OS.get_executable_path(), args))
 	if error != OK:
 		show_error(error_string(error))
 		return
@@ -768,9 +769,9 @@ func test_clean(path: String) -> void:
 	clean_timer.start()
 
 static func run_clean_test(binary: String, args: PackedStringArray) -> String:
-	var output := []
+	var output: Array = []
 	if OS.execute(binary, args, output, true) != 0:
-		var log_text := "\n".join(output)
+		var log_text: String = "\n".join(output)
 		return "Clean-project test failed.\n" + (log_text if log_text.length() <= 3500 else log_text.left(1700) + "\n…\n" + log_text.right(1700))
 	return ""
 

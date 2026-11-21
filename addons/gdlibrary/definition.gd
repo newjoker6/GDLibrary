@@ -8,6 +8,6 @@ extends Resource
 @export var requirements: PackedStringArray
 @export var output_path: String
 
-@export var namespace_enabled := false
-@export var embed_resources := false
+@export var namespace_enabled: bool = false
+@export var embed_resources: bool = false
 @export var asset_inputs: PackedStringArray

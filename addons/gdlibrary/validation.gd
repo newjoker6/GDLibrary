@@ -1,7 +1,7 @@
 @tool
 extends RefCounted
 
-const Package := preload("package.gd")
+const Package = preload("package.gd")
 
 static func package_id_error(value: String) -> String:
 	if value.contains(" ") or value.contains("\t") or value.contains("\n") or value.contains("\r"):
@@ -13,7 +13,7 @@ static func package_id_error(value: String) -> String:
 static func imported_destination(path: String) -> bool:
 	if not path.begins_with("res://"):
 		return false
-	var folder := path.get_base_dir()
+	var folder: String = path.get_base_dir()
 	while folder != "res://":
 		if folder.get_file().begins_with(".") or FileAccess.file_exists(folder.path_join(".gdignore")) or FileAccess.file_exists(folder.path_join("project.godot")):
 			return false
@@ -24,7 +24,7 @@ static func destination_error(id: String, path: String, catalog: RefCounted, res
 	if not imported_destination(path):
 		return ""
 	var installed: Dictionary = catalog.package_infos.get(id, {})
-	var reason := ""
+	var reason: String = ""
 	if not result.overlaps.is_empty():
 		reason = "Installed packages expose the same public classes: " + ", ".join(result.overlaps)
 	elif not installed.is_empty() and installed.path != path:
@@ -32,35 +32,35 @@ static func destination_error(id: String, path: String, catalog: RefCounted, res
 	return reason + "\nChoose a location outside this project or in a .gdignore folder." if not reason.is_empty() else ""
 
 static func review(recipe: Resource, catalog: RefCounted, dirty: PackedStringArray = PackedStringArray()) -> Dictionary:
-	var errors := PackedStringArray()
-	var suggestions := {}
-	var id_error := package_id_error(recipe.package_id)
-	var overlaps := PackedStringArray()
+	var errors: PackedStringArray = PackedStringArray()
+	var suggestions: Dictionary = {}
+	var id_error: String = package_id_error(recipe.package_id)
+	var overlaps: PackedStringArray = PackedStringArray()
 	if not id_error.is_empty():
 		errors.append(id_error)
 	if not Package.Versions.valid(recipe.version):
 		errors.append("Enter a version with three numbers, such as 1.2.0.")
-	var parsed := Package.Versions.requirements(recipe.requirements, recipe.package_id)
+	var parsed: Dictionary = Package.Versions.requirements(recipe.requirements, recipe.package_id)
 	if parsed.has("error"):
 		errors.append(parsed.error)
 	var rules: Dictionary = parsed.get("rules", {})
-	var required := rules.duplicate()
-	var pending := rules.keys()
+	var required: Dictionary = rules.duplicate()
+	var pending: Array = rules.keys()
 	while not pending.is_empty():
 		var dependency: String = pending.pop_back()
 		for child: String in catalog.package_infos.get(dependency, {}).get("requires", []):
 			if not required.has(child):
 				required[child] = true
 				pending.append(child)
-	var globals := {}
+	var globals: Dictionary = {}
 	for info: Dictionary in ProjectSettings.get_global_class_list():
 		globals[String(info.class)] = String(info.path)
-	var names := {}
-	var public_bindings := {}
-	var selected := {}
-	var sources := {}
-	var assets := {}
-	var asset_problem := Package.collect_inputs(recipe.asset_inputs, assets, recipe.embed_resources)
+	var names: Dictionary = {}
+	var public_bindings: Dictionary = {}
+	var selected: Dictionary = {}
+	var sources: Dictionary = {}
+	var assets: Dictionary = {}
+	var asset_problem: String = Package.collect_inputs(recipe.asset_inputs, assets, recipe.embed_resources)
 	if not asset_problem.is_empty():
 		errors.append(asset_problem)
 	for path: String in recipe.sources:
@@ -69,11 +69,11 @@ static func review(recipe: Resource, catalog: RefCounted, dirty: PackedStringArr
 			continue
 		if dirty.has(path):
 			errors.append("Save the script before packing: " + path)
-		var source := FileAccess.get_file_as_string(path)
+		var source: String = FileAccess.get_file_as_string(path)
 		sources[path] = source
-		var declaration := Package.global_declaration(source)
-		var public_name := declaration.get_string(1) if declaration != null else path.get_file().get_basename().to_pascal_case()
-		var key := public_name.to_lower()
+		var declaration: RegExMatch = Package.global_declaration(source)
+		var public_name: String = declaration.get_string(1) if declaration != null else path.get_file().get_basename().to_pascal_case()
+		var key: String = public_name.to_lower()
 		if not Package.valid_id(public_name):
 			errors.append("Invalid class name '%s' in %s." % [public_name, path])
 		if names.has(key):
@@ -89,7 +89,7 @@ static func review(recipe: Resource, catalog: RefCounted, dirty: PackedStringArr
 					errors.append("Public class '%s' from %s conflicts with %s." % [public_name, path, other_path])
 			if ClassDB.class_exists(public_name) or ProjectSettings.has_setting("autoload/" + public_name):
 				errors.append("%s conflicts with the engine or autoload name '%s'." % [path, public_name])
-	var exports := {}
+	var exports: Dictionary = {}
 	if recipe.namespace_enabled:
 		exports[recipe.package_id.to_lower()] = recipe.package_id
 		var namespace_path: String = globals.get(recipe.package_id, "")
@@ -116,7 +116,7 @@ static func review(recipe: Resource, catalog: RefCounted, dirty: PackedStringArr
 		errors.append("Include at least one public script.")
 	for path: String in sources:
 		var source: String = sources[path]
-		for ref in Package.source_refs(source, path):
+		for ref: Dictionary in Package.source_refs(source, path):
 			if String(ref.path).begins_with("uid://"):
 				errors.append("%s references unknown resource %s." % [path, ref.path])
 			if Package.is_asset(ref.path) and Package.collect_asset(ref.path, assets) != OK:
@@ -153,7 +153,7 @@ static func review(recipe: Resource, catalog: RefCounted, dirty: PackedStringArr
 			errors.append("Requires %s. Installed version: %s." % [Package.Versions.describe(id, rules[id]), info.get("version", "unversioned") if info.get("version", "") != "" else "unversioned"])
 	if errors.is_empty():
 		for path: String in sources:
-			var script := ResourceLoader.load(path, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as GDScript
+			var script: GDScript = ResourceLoader.load(path, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as GDScript
 			if script == null or script.reload() != OK:
 				errors.append("Godot could not compile " + path)
 	return {"assets": PackedStringArray(assets.keys()), "errors": errors, "suggestions": suggestions, "overlaps": overlaps}

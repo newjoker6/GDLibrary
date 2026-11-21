@@ -2,14 +2,14 @@
 class_name GDLibraryAssets
 extends RefCounted
 
-const INDEX := "res://.godot/gdlib/asset_roots.json"
-static var initialized := false
-static var embedded_packages := {}
+const INDEX: String = "res://.godot/gdlib/asset_roots.json"
+static var initialized: bool = false
+static var embedded_packages: Dictionary = {}
 
 static func path(package_id: String, relative_path: String) -> String:
 	if not package_id.is_valid_ascii_identifier() or relative_path.is_empty() or not relative_path.is_relative_path() or relative_path.contains(":") or relative_path.contains("\\"):
 		return ""
-	for segment in relative_path.split("/"):
+	for segment: String in relative_path.split("/"):
 		if not segment.is_valid_filename() or segment.begins_with("."):
 			return ""
 	if not initialized:

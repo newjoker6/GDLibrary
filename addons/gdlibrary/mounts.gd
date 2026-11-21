@@ -1,6 +1,6 @@
 extends Node
 
-const INDEX := "res://.godot/gdlib/mounts.json"
+const INDEX: String = "res://.godot/gdlib/mounts.json"
 
 func _init() -> void:
 	if not FileAccess.file_exists(INDEX):

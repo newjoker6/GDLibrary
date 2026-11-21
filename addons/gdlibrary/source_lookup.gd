@@ -1,15 +1,15 @@
 @tool
 extends ConfirmationDialog
 
-const Package := preload("package.gd")
+const Package = preload("package.gd")
 
-var input := TextEdit.new()
-var result := Label.new()
+var input: TextEdit = TextEdit.new()
+var result: Label = Label.new()
 
 func _ready() -> void:
 	title = "Go to GDLibrary Source"
 	get_ok_button().text = "Open Author Script"
-	var layout := VBoxContainer.new()
+	var layout: VBoxContainer = VBoxContainer.new()
 	add_child(layout)
 	input.placeholder_text = "Paste a stack frame from a package built with GDLibrary 2.5 or later."
 	input.custom_minimum_size = Vector2(540, 90)
@@ -21,16 +21,16 @@ func _ready() -> void:
 	update_result()
 
 static func locate(frame: String) -> Dictionary:
-	var pattern := RegEx.create_from_string("(res://\\.godot/gdlib/source/[^\\r\\n]+?\\.gd):([1-9][0-9]*)")
-	for match_ in pattern.search_all(frame):
-		var location := Package.source_location(match_.get_string(1))
+	var pattern: RegEx = RegEx.create_from_string("(res://\\.godot/gdlib/source/[^\\r\\n]+?\\.gd):([1-9][0-9]*)")
+	for match_: RegExMatch in pattern.search_all(frame):
+		var location: Dictionary = Package.source_location(match_.get_string(1))
 		if not location.is_empty():
 			location["line"] = match_.get_string(2).to_int()
 			return location
 	return {}
 
 func update_result() -> void:
-	var frame := locate(input.text)
+	var frame: Dictionary = locate(input.text)
 	get_ok_button().disabled = true
 	if frame.is_empty():
 		result.text = "" if input.text.is_empty() else "No mapped GDLibrary frame found."
@@ -45,9 +45,9 @@ func update_result() -> void:
 	get_ok_button().disabled = false
 
 func open_source() -> void:
-	var frame := locate(input.text)
+	var frame: Dictionary = locate(input.text)
 	if frame.is_empty() or get_ok_button().disabled:
 		return
-	var script := ResourceLoader.load(frame.path, "GDScript") as GDScript
+	var script: GDScript = ResourceLoader.load(frame.path, "GDScript") as GDScript
 	if script != null:
 		EditorInterface.edit_script(script, int(frame.line), 1)
