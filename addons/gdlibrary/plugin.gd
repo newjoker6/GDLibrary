@@ -63,6 +63,8 @@ var preset_rows: VBoxContainer = VBoxContainer.new()
 var picking_more: bool = false
 var selected_sources: PackedStringArray = PackedStringArray()
 var library_dir_created: bool = false
+var namespace_scopes: Dictionary[String, String] = {}
+var documented_scripts: Dictionary[String, Script] = {}
 var refresh_queued: bool = false
 var attempted_imports: Dictionary = {}
 var last_issues: PackedStringArray = PackedStringArray()
@@ -185,6 +187,10 @@ func _disable_plugin() -> void:
 		remove_autoload_singleton(MOUNTER)
 
 func _exit_tree() -> void:
+	var script_editor: ScriptEditor = EditorInterface.get_script_editor()
+	for script: Script in documented_scripts.values():
+		script_editor.clear_docs_from_script(script)
+	documented_scripts.clear()
 	remove_tool_menu_item("Go to GDLibrary Source…")
 	remove_tool_menu_item("Test GDLibrary in Clean Project…")
 	if clean_thread.is_started():
@@ -724,7 +730,38 @@ func refresh() -> void:
 		filesystem.scan()
 		set_process(true)
 	else:
+		sync_script_documentation()
 		repair_failed_imports(filesystem)
+
+func sync_script_documentation() -> void:
+	var wanted: Dictionary[String, bool] = {}
+	for id: String in catalog.package_infos:
+		if catalog.package_states.get(id) != "Ready":
+			continue
+		var library: Dictionary = catalog.package_infos[id]
+		if library.get("scoped", false) and not library.members.is_empty():
+			var binding: String = Catalog.API_DIR.path_join(id + ".gd")
+			var scope: String = library.members[0].scope
+			wanted[binding] = true
+			if namespace_scopes.get(binding, "") != scope:
+				documented_scripts.erase(binding)
+				namespace_scopes[binding] = scope
+		for member: Dictionary in library.members:
+			wanted[Package.body_path(member)] = true
+	var script_editor: ScriptEditor = EditorInterface.get_script_editor()
+	for path: String in documented_scripts.keys():
+		if not wanted.has(path):
+			script_editor.clear_docs_from_script(documented_scripts[path])
+			documented_scripts.erase(path)
+			namespace_scopes.erase(path)
+	for path: String in wanted:
+		if documented_scripts.has(path):
+			continue
+		var cache_mode: ResourceLoader.CacheMode = ResourceLoader.CACHE_MODE_REPLACE if namespace_scopes.has(path) else ResourceLoader.CACHE_MODE_REUSE
+		var script: Script = ResourceLoader.load(path, "GDScript", cache_mode) as Script
+		if script != null:
+			script_editor.update_docs_from_script(script)
+			documented_scripts[path] = script
 
 func repair_failed_imports(filesystem: EditorFileSystem) -> void:
 	var pending: PackedStringArray = PackedStringArray()

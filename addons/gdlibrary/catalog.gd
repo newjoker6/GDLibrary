@@ -105,11 +105,14 @@ func apply(groups: Dictionary, scripts: Dictionary) -> bool:
 				pending.erase(id)
 				continue
 			if library.get("scoped", false):
-				var namespace_source: String = "class_name %s\nextends RefCounted\nconst _GDLIB_NAMESPACE: bool = true\n%s\n" % [id, NAMESPACE_WARNING_IGNORE]
+				var namespace_source: String = "## Namespace containing the public classes provided by the %s package.\nclass_name %s\nextends RefCounted\nconst _GDLIB_NAMESPACE: bool = true\n%s\n" % [id, id, NAMESPACE_WARNING_IGNORE]
 				for member: Dictionary in library.members:
 					archives.append(Package.archive_path(member))
 					if not member.private:
-						namespace_source += "const %s = preload(%s)\n" % [member.name, JSON.stringify(Package.body_path(member))]
+						var body_path: String = Package.body_path(member)
+						var doc_name: String = JSON.stringify(body_path.trim_prefix("res://"))
+						namespace_source += "## Open the [url=#%s]%s class reference[/url].\n" % [doc_name, member.name]
+						namespace_source += "const %s = preload(%s)\n" % [member.name, JSON.stringify(body_path)]
 				wanted[API_DIR.path_join(id + ".gd")] = namespace_source
 				available[id] = true
 				pending.erase(id)
@@ -229,7 +232,10 @@ func collect(directory: EditorFileSystemDirectory, groups: Dictionary, scripts: 
 		collect(directory.get_subdir(index), groups, scripts)
 
 static func is_binding(path: String) -> bool:
-	var lines: PackedStringArray = FileAccess.get_file_as_string(path).strip_edges().split("\n")
+	var lines: Array[String] = []
+	for line: String in FileAccess.get_file_as_string(path).strip_edges().split("\n"):
+		if not line.begins_with("##"):
+			lines.append(line)
 	var library_name: String = path.get_file().get_basename()
 	if lines.size() >= 4 and lines[0] == "class_name " + library_name and lines[1] == "extends RefCounted" and lines[2] in ["const _GDLIB_NAMESPACE := true", "const _GDLIB_NAMESPACE: bool = true"]:
 		var first_alias: int = 4 if lines[3] == NAMESPACE_WARNING_IGNORE else 3
